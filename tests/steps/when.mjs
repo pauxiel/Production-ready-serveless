@@ -14,3 +14,10 @@ const viaHandler = async (event, functionName) => {
 }
 
 export const we_invoke_get_index = () => viaHandler({}, 'get-index')
+export const we_invoke_get_restaurants = () => viaHandler({}, 'get-restaurants')
+export const we_invoke_search_restaurants = theme => {
+  let event = { 
+    body: JSON.stringify({ theme })
+  }
+  return viaHandler(event, 'search-restaurants')
+}
