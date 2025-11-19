@@ -1,20 +1,93 @@
+const mode = process.env.TEST_MODE
+
 const APP_ROOT = '../../'
 import _ from 'lodash'
+import { AwsClient } from 'aws4fetch'
+import { fromNodeProviderChain } from '@aws-sdk/credential-providers'
 
 const viaHandler = async (event, functionName) => {
   const { handler } = await import(`${APP_ROOT}/functions/${functionName}.mjs`)
 
   const context = {}
   const response = await handler(event, context)
-  const contentType = _.get(response, 'headers.Content-Type', 'application/json');
+  const contentType = _.get(response, 'headers.content-type', 'application/json');
   if (response.body && contentType === 'application/json') {
     response.body = JSON.parse(response.body);
   }
   return response
 }
 
-export const we_invoke_get_index = () => viaHandler({}, 'get-index')
-export const we_invoke_get_restaurants = () => viaHandler({}, 'get-restaurants')
+
+const viaHttp = async (relPath, method, opts) => {
+  const url = `${process.env.rest_api_url}/${relPath}`
+  console.info(`invoking via HTTP ${method} ${url}`)
+
+  const body = _.get(opts, "body")
+  const headers = {}
+
+  const authHeader = _.get(opts, "auth")
+  if (authHeader) {
+    headers.Authorization = authHeader
+  }
+
+  let res;
+  if (_.get(opts, "iam_auth", false) === true) {
+    const credentialProvider = fromNodeProviderChain()
+    const credentials = await credentialProvider()
+    const aws = new AwsClient({
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+      sessionToken: credentials.sessionToken
+    })
+
+    res = await aws.fetch(url, { method, headers, body })
+  } else {
+    res = await fetch(url, { method, headers, body })
+  }
+
+  const respHeaders = {}
+  for (const [key, value] of res.headers.entries()) {
+    respHeaders[key] = value
+    if (key.toLowerCase() === 'content-type') {
+      // provide common casings so tests can access headers['content-Type'] or ['content-type']
+      respHeaders['content-type'] = value
+      respHeaders['content-Type'] = value
+    }
+  }
+
+    const respBody = respHeaders['content-type'] && respHeaders['content-type'].includes('application/json') 
+    ? await res.json() 
+    : await res.text()
+
+  return {
+    statusCode: res.status,
+    body: respBody,
+    headers: respHeaders
+  }
+}
+
+export const we_invoke_get_index = async () => {
+  switch (mode) {
+    case 'handler':
+      return await viaHandler({}, 'get-index')
+    case 'http':
+      return await viaHttp('', 'GET')
+    default:
+      throw new Error(`unsupported mode: ${mode}`)
+  }
+}
+
+export const we_invoke_get_restaurants = async () => {
+  switch (mode) {
+    case 'handler':
+      return await viaHandler({}, 'get-restaurants')
+    case 'http':
+      return await viaHttp('restaurants', 'GET', { iam_auth: true })
+    default:
+      throw new Error(`unsupported mode: ${mode}`)
+  }
+}
+
 export const we_invoke_search_restaurants = theme => {
   let event = { 
     body: JSON.stringify({ theme })
