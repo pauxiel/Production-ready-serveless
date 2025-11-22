@@ -17,6 +17,8 @@ provider:
           Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/${sls:stage}/GET/restaurants
   environment:
    rest_api_url: !Sub https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}
+   serviceName: ${self:service}
+   stage: ${sls:stage}
 
 functions:
   get-index:
