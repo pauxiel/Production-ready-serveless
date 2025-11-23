@@ -6,9 +6,11 @@ import ssm from '@middy/ssm'
 const dynamodbClient = new DynamoDB()
 const dynamodb = DynamoDBDocumentClient.from(dynamodbClient)
 
-// const defaultResults = parseInt(process.env.default_results)
-const { serviceName, stage } = process.env
+const { serviceName, ssmStage } = process.env
 const tableName = process.env.restaurants_table
+
+const middyCacheEnabled = true
+const middyCacheExpiry = 1 * 60 * 1000 // 1 min
 
 const getRestaurants = async (count) => {
   console.log(`fetching ${count} restaurants from ${tableName}...`)
@@ -30,10 +32,10 @@ export const handler = middy(async (event, context) => {
 
   return response
 }).use(ssm({
-  cache: true,
-  cacheExpiry: 1 * 60 * 1000, // 1 mins
+  cache: middyCacheEnabled,
+  cacheExpiry: middyCacheExpiry,
   setToContext: true,
   fetchData: {
-    config: `/${serviceName}/${stage}/get-restaurants/config`
+    config: `/${serviceName}/${ssmStage}/get-restaurants/config`
   }
 }))

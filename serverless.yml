@@ -18,12 +18,14 @@ provider:
         - Effect: Allow
           Action: ssm:GetParameters*
           Resource:
-            - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${self:service}/${sls:stage}/get-restaurants/config
-            - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${self:service}/${sls:stage}/search-restaurants/config
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${self:service}/${param:ssmStage, sls:stage}/get-restaurants/config
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${self:service}/${param:ssmStage, sls:stage}/search-restaurants/config
+                - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${self:service}/${param:ssmStage, sls:stage}/search-restaurants/secretString
   environment:
    rest_api_url: !Sub https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}
    serviceName: ${self:service}
    stage: ${sls:stage}
+   ssmStage: ${param:ssmStage, sls:stage}
 
 functions:
   get-index:
@@ -64,6 +66,18 @@ functions:
 
 resources:
   Resources:
+    ServiceUrlParameter:
+      Type: AWS::SSM::Parameter
+      Properties:
+        Type: String
+        Name: /${self:service}/${sls:stage}/serviceUrl
+        Value:
+          Fn::Join:
+            - ""
+            - - https://
+              - !Ref ApiGatewayRestApi
+              - .execute-api.${aws:region}.amazonaws.com/${sls:stage}
+
     RestaurantsTable:
       Type: AWS::DynamoDB::Table
       Properties:
