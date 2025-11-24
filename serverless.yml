@@ -10,6 +10,9 @@ provider:
     role:
       statements:
         - Effect: Allow
+          Action: events:PutEvents
+          Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:event-bus/${self:service}_${sls:stage}_order_events
+        - Effect: Allow
           Action: dynamodb:scan
           Resource: !GetAtt RestaurantsTable.Arn
         - Effect: Allow
@@ -31,6 +34,20 @@ provider:
    ssmStage: ${param:ssmStage, sls:stage}
 
 functions:
+
+  place-order:
+    handler: functions/place-order.handler
+    events:
+      - http:
+          path: /orders
+          method: post
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+    environment:
+      bus_name: !Ref EventBus
+      
   get-index:
     handler: functions/get-index.handler
     events:
