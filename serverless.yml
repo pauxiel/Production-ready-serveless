@@ -55,9 +55,11 @@ functions:
           path: /
           method: get
     environment:
+      orders_api: !Sub https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}/orders
       restaurants_api: !Sub https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}/restaurants
       cognito_user_pool_id: !Ref CognitoUserPool
       cognito_client_id: !Ref WebCognitoUserPoolClient
+      cognito_server_client_id: !Ref ServerCognitoUserPoolClient
   
   search-restaurants:
     handler: functions/search-restaurants.handler
@@ -158,6 +160,15 @@ resources:
           - ALLOW_REFRESH_TOKEN_AUTH
         PreventUserExistenceErrors: ENABLED
 
+    ServerCognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: server
+        UserPoolId: !Ref CognitoUserPool
+        ExplicitAuthFlows:
+          - ALLOW_ADMIN_USER_PASSWORD_AUTH
+        PreventUserExistenceErrors: ENABLED
+
   Outputs:
     RestaurantsTableName:
       Value: !Ref RestaurantsTable
@@ -169,6 +180,9 @@ resources:
 
     CognitoUserPoolWebClientId:
      Value: !Ref WebCognitoUserPoolClient
+
+    CognitoUserPoolServerClientId:
+      Value: !Ref ServerCognitoUserPoolClient
 
     EventBusName:
       Value: !Ref EventBus
