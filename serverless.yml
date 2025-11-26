@@ -27,6 +27,9 @@ provider:
         - Effect: Allow
           Action: kms:Decrypt
           Resource: ${ssm:/${self:service}/${param:ssmStage, sls:stage}/kmsArn}
+        - Effect: Allow
+          Action: sns:Publish
+          Resource: !Ref RestaurantNotificationTopic
   environment:
    rest_api_url: !Sub https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}
    serviceName: ${self:service}
@@ -86,8 +89,24 @@ functions:
       default_results: 8
       restaurants_table: !Ref RestaurantsTable
 
+  notify-restaurant:
+    handler: functions/notify-restaurant.handler
+    events:
+      - eventBridge:
+          eventBus: !Ref EventBus
+          pattern:
+            source:
+              - big-mouth
+            detail-type:
+              - order_placed
+    environment:
+      bus_name: !Ref EventBus
+      restaurant_notification_topic: !Ref RestaurantNotificationTopic
+
 resources:
   Resources:
+    RestaurantNotificationTopic:
+      Type: AWS::SNS::Topic
     EventBus:
       Type: AWS::Events::EventBus
       Properties:
@@ -187,6 +206,11 @@ resources:
     EventBusName:
       Value: !Ref EventBus
 
+    RestaurantNotificationTopicName:
+      Value: !GetAtt RestaurantNotificationTopic.TopicName
+
+    RestaurantNotificationTopicArn:
+      Value: !Ref RestaurantNotificationTopic
 plugins:
   - serverless-export-env
 

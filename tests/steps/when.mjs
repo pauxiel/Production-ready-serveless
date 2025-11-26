@@ -15,8 +15,9 @@ const viaHandler = async (event, functionName) => {
     || _.get(response, 'headers.content-Type') 
     || _.get(response, 'headers.Content-Type') 
     || 'application/json';
-  if (response.body && contentType.includes('application/json')) {
+  if (_.get(response, 'body') && contentType.includes('application/json')) {
     response.body = JSON.parse(response.body);
+  
   }
   return response
 }
@@ -110,5 +111,13 @@ export const we_invoke_place_order = async (user, restaurantName) => {
       return await viaHttp('orders', 'POST', { body, auth })
     default:
       throw new Error(`unsupported mode: ${mode}`)
+  }
+}
+
+export const we_invoke_notify_restaurant = async (event) => {
+  if (mode === 'handler') {
+    await viaHandler(event, 'notify-restaurant')
+  } else {
+    throw new Error('not supported')
   }
 }
