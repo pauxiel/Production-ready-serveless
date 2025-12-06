@@ -1,14 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
+import { describe, it, beforeAll, afterAll } from 'vitest'
 import * as when from '../steps/when'
 import { Chance } from 'chance'
-import { EventBridgeClient } from '@aws-sdk/client-eventbridge'
-import { SNSClient } from '@aws-sdk/client-sns'
 import { startListening } from '../messages.mjs'
 
 const chance = Chance()
-
-const mockEvbSend = vi.fn()
-const mockSnsSend = vi.fn()
 
 describe(`When we invoke the notify-restaurant function`, () => {
   const event = {
@@ -23,61 +18,32 @@ describe(`When we invoke the notify-restaurant function`, () => {
   let listener
 
   beforeAll(async () => {
-    if (process.env.TEST_MODE === 'handler') {
-      EventBridgeClient.prototype.send = mockEvbSend
-      SNSClient.prototype.send = mockSnsSend
-
-      mockEvbSend.mockReturnValue({})
-      mockSnsSend.mockReturnValue({})
-    } else {
-      listener = startListening()      
-    }
-
+    listener = startListening()      
     await when.we_invoke_notify_restaurant(event)
   })
 
   afterAll(async () => {
-    if (process.env.TEST_MODE === 'handler') {
-      mockEvbSend.mockClear()
-      mockSnsSend.mockClear()
-    } else {
-      await listener.stop()
-    }
+    await listener.stop()
   })
 
-  if (process.env.TEST_MODE === 'handler') {
-    it(`Should publish message to SNS`, async () => {
-      expect(mockSnsSend).toHaveBeenCalledTimes(1)
-      const [ publishCmd ] = mockSnsSend.mock.calls[0]
+  it(`Should publish message to SNS`, async () => {
+    const expectedMsg = JSON.stringify(event.detail)
+    await listener.waitForMessage(x => 
+      x.sourceType === 'sns' &&
+      x.source === process.env.restaurant_notification_topic &&
+      x.message === expectedMsg
+    )
+  }, 10000)
 
-      expect(publishCmd.input).toEqual({
-        Message: expect.stringMatching(`"restaurantName":"Fangtasia"`),
-        TopicArn: expect.stringMatching(process.env.restaurant_notification_topic)
-      })
+  it(`Should publish "restaurant_notified" event to EventBridge`, async () => {
+    const expectedMsg = JSON.stringify({
+      ...event,
+      'detail-type': 'restaurant_notified'
     })
-
-    it(`Should publish event to EventBridge`, async () => {
-      expect(mockEvbSend).toHaveBeenCalledTimes(1)
-      const [ putEventsCmd ] = mockEvbSend.mock.calls[0]
-      expect(putEventsCmd.input).toEqual({
-        Entries: [
-          expect.objectContaining({
-            Source: 'big-mouth',
-            DetailType: 'restaurant_notified',
-            Detail: expect.stringContaining(`"restaurantName":"Fangtasia"`),
-            EventBusName: process.env.bus_name
-          })
-        ]
-      })
-    })
-  } else {
-    it(`Should publish message to SNS`, async () => {
-      const expectedMsg = JSON.stringify(event.detail)
-      await listener.waitForMessage(x => 
-        x.sourceType === 'sns' &&
-        x.source === process.env.restaurant_notification_topic &&
-        x.message === expectedMsg
-      )
-    }, 10000)
-  }
+    await listener.waitForMessage(x => 
+      x.sourceType === 'eventbridge' &&
+      x.source === process.env.bus_name &&
+      x.message === expectedMsg
+    )
+  }, 10000)
 })
