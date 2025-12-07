@@ -286,13 +286,14 @@ resources:
 
   Conditions:
     IsE2eTest:
-      Fn::Equals:
+      Fn::StartsWith:
         - ${sls:stage}
         - dev
 
 plugins:
   - serverless-export-env
   - serverless-export-outputs
+  - serverless-plugin-extrinsic-functions
 
 custom:
   export-env:
