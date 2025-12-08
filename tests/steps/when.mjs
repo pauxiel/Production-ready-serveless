@@ -24,9 +24,13 @@ const viaHandler = async (event, functionName) => {
 
   const context = {}
   const response = await handler(event, context)
-  const contentType = _.get(response, 'headers.content-type', 'application/json');
-  if (_.get(response, 'body') && contentType === 'application/json') {
+    const contentType = _.get(response, 'headers.content-type') 
+    || _.get(response, 'headers.content-Type') 
+    || _.get(response, 'headers.Content-Type') 
+    || 'application/json';
+  if (_.get(response, 'body') && contentType.includes('application/json')) {
     response.body = JSON.parse(response.body);
+  
   }
   return response
 }
@@ -61,6 +65,11 @@ const viaHttp = async (relPath, method, opts) => {
   const respHeaders = {}
   for (const [key, value] of res.headers.entries()) {
     respHeaders[key] = value
+    if (key.toLowerCase() === 'content-type') {
+      // provide common casings so tests can access headers['content-Type'] or ['content-type']
+      respHeaders['content-type'] = value
+      respHeaders['content-Type'] = value
+    }
   }
 
   const respBody = respHeaders['content-type'] === 'application/json' 
