@@ -1,5 +1,5 @@
 import { describe, it, beforeAll, expect, vi } from 'vitest'
-import * as when from '../steps/when'
+import * as when from '../steps/when.mjs'
 import { EventBridgeClient } from '@aws-sdk/client-eventbridge'
 import { SNSClient } from '@aws-sdk/client-sns'
 import { Chance } from 'chance'
