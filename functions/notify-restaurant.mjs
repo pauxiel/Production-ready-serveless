@@ -38,7 +38,4 @@ const _handler = async (event) => {
   return orderId
 }
 
-export const handler = makeIdempotent(_handler, { 
-  persistenceStore,
-  dataIndexArgument: 0
-})
+export const handler = makeIdempotent(_handler, { persistenceStore })

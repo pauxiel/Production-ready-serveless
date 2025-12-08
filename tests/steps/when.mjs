@@ -1,11 +1,10 @@
-const mode = process.env.TEST_MODE
-import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge'
-
 const APP_ROOT = '../../'
 import _ from 'lodash'
 import { AwsClient } from 'aws4fetch'
-import { fromNodeProviderChain } from '@aws-sdk/credential-providers'
+import { fromNodeProviderChain } from "@aws-sdk/credential-providers"
+import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge'
 
+const mode = process.env.TEST_MODE
 
 const viaEventBridge = async (busName, source, detailType, detail) => {
   const eventBridge = new EventBridgeClient()
@@ -25,18 +24,12 @@ const viaHandler = async (event, functionName) => {
 
   const context = {}
   const response = await handler(event, context)
-  // Find content-type header (case-insensitive)
-  const contentType = _.get(response, 'headers.content-type') 
-    || _.get(response, 'headers.content-Type') 
-    || _.get(response, 'headers.Content-Type') 
-    || 'application/json';
-  if (_.get(response, 'body') && contentType.includes('application/json')) {
+  const contentType = _.get(response, 'headers.content-type', 'application/json');
+  if (_.get(response, 'body') && contentType === 'application/json') {
     response.body = JSON.parse(response.body);
-  
   }
   return response
 }
-
 
 const viaHttp = async (relPath, method, opts) => {
   const url = `${process.env.rest_api_url}/${relPath}`
@@ -68,14 +61,9 @@ const viaHttp = async (relPath, method, opts) => {
   const respHeaders = {}
   for (const [key, value] of res.headers.entries()) {
     respHeaders[key] = value
-    if (key.toLowerCase() === 'content-type') {
-      // provide common casings so tests can access headers['content-Type'] or ['content-type']
-      respHeaders['content-type'] = value
-      respHeaders['content-Type'] = value
-    }
   }
 
-    const respBody = respHeaders['content-type'] && respHeaders['content-type'].includes('application/json') 
+  const respBody = respHeaders['content-type'] === 'application/json' 
     ? await res.json() 
     : await res.text()
 
@@ -108,11 +96,18 @@ export const we_invoke_get_restaurants = async () => {
   }
 }
 
-export const we_invoke_search_restaurants = theme => {
-  let event = { 
-    body: JSON.stringify({ theme })
+export const we_invoke_search_restaurants = async (theme, user) => {
+  const body = JSON.stringify({ theme })
+
+  switch (mode) {
+    case 'handler':
+      return await viaHandler({ body }, 'search-restaurants')
+    case 'http':
+      const auth = user.idToken
+      return await viaHttp('restaurants/search', 'POST', { body, auth })
+    default:
+      throw new Error(`unsupported mode: ${mode}`)
   }
-  return viaHandler(event, 'search-restaurants')
 }
 
 export const we_invoke_place_order = async (user, restaurantName) => {
