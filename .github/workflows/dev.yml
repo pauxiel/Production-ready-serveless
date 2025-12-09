@@ -10,10 +10,6 @@ on:
       - 'package-lock.json'
       - '.github/workflows/dev.yml'
       - 'tests/**'
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
 
 jobs:
   deploy:
