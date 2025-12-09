@@ -3,6 +3,17 @@ name: deploy dev
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'functions/**'
+      - 'serverless.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/dev.yml'
+      - 'tests/**'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
 
 jobs:
   deploy:
@@ -23,6 +34,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
+          cache: 'npm'
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
