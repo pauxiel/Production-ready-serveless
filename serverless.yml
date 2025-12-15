@@ -13,7 +13,37 @@ provider:
    stage: ${sls:stage}
    ssmStage: ${param:ssmStage, sls:stage}
 
+stepFunctions:
+  stateMachines:
+    orderFlow:
+      definition: ${file(state_machines/order-flow.yml)}
+
 functions:
+
+  seed-orders:
+    handler: functions/seed-orders.handler
+    events:
+      - eventBridge:
+          eventBus: !Ref EventBus
+          pattern:
+            source:
+              - big-mouth
+            detail-type:
+              - order_placed
+    environment:
+      orders_table: !Ref OrdersTable
+      idempotency_table: !Ref IdempotencyTable
+    iamRoleStatements:
+      - Effect: Allow
+        Action: dynamodb:PutItem
+        Resource: !GetAtt OrdersTable.Arn
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
+        Resource: !GetAtt IdempotencyTable.Arn
 
   place-order:
     handler: functions/place-order.handler
@@ -132,6 +162,27 @@ functions:
 
 resources:
   Resources:
+    UserNotificationTopic:
+      Type: AWS::SNS::Topic
+
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+
+    EventBusArchive:
+      Type: AWS::Events::Archive
+      Properties:
+        ArchiveName: ${self:service}-${sls:stage}-archive
+        SourceArn: !GetAtt EventBus.Arn
+        Description: Archive for all events from the order events bus
+        RetentionDays: 0 # retain indefinitely
 
     AlarmTopic:
       Type: AWS::SNS::Topic
@@ -388,7 +439,7 @@ plugins:
   - serverless-export-env
   - serverless-export-outputs
   - serverless-plugin-extrinsic-functions
-  - serverless-iam-roles-per-function
+  - serverless-step-functions
 
 custom:
   export-env:
